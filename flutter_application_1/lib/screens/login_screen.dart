@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
-  final VoidCallback onLogin;
+  final VoidCallback onLogin; // REQUIRED
+
   const LoginScreen({super.key, required this.onLogin});
 
   @override
@@ -9,12 +11,41 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _username = TextEditingController();
-  final TextEditingController _password = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _loading = false;
 
-  void _tryLogin() {
-    if (_username.text.isNotEmpty && _password.text.isNotEmpty) {
-      widget.onLogin();
+  Future<void> _login() async {
+    setState(() => _loading = true);
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      widget.onLogin(); // IMPORTANT
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signup() async {
+    setState(() => _loading = true);
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      widget.onLogin(); // IMPORTANT
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      setState(() => _loading = false);
     }
   }
 
@@ -23,39 +54,37 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(30),
+          padding: const EdgeInsets.all(32.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                "Welcome Back 👋",
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 30),
+              const Text("Login", style: TextStyle(fontSize: 28)),
+              const SizedBox(height: 20),
               TextField(
-                controller: _username,
-                decoration: const InputDecoration(
-                  labelText: "Username",
-                  border: OutlineInputBorder(),
-                ),
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: "Email"),
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 10),
               TextField(
-                controller: _password,
-                decoration: const InputDecoration(
-                  labelText: "Password",
-                  border: OutlineInputBorder(),
-                ),
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: "Password"),
                 obscureText: true,
               ),
-              const SizedBox(height: 25),
-              ElevatedButton(
-                onPressed: _tryLogin,
-                style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 50, vertical: 12)),
-                child: const Text("Login", style: TextStyle(fontSize: 18)),
-              ),
+              const SizedBox(height: 20),
+              _loading
+                  ? const CircularProgressIndicator()
+                  : Column(
+                      children: [
+                        ElevatedButton(
+                          onPressed: _login,
+                          child: const Text("LOGIN"),
+                        ),
+                        TextButton(
+                          onPressed: _signup,
+                          child: const Text("Create account"),
+                        )
+                      ],
+                    ),
             ],
           ),
         ),

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "897820166429",
+    "project_id": "collabtasks-2bdf6",
+    "storage_bucket": "collabtasks-2bdf6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:897820166429:android:349944b108e2b54c4fb9f4",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCas1nx7Mu8F_YRsVYetFCWfslUe7icOr8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

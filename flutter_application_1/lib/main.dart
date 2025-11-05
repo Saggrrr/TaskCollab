@@ -3,26 +3,20 @@ import 'screens/login_screen.dart';
 import 'screens/tasks_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/chatroom_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  bool _isLoggedIn = false;
-
-  void _login() {
-    setState(() {
-      _isLoggedIn = true;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,9 +24,22 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       title: 'To-Do App',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: _isLoggedIn
-          ? const MainHomeScreen()
-          : LoginScreen(onLogin: _login),
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasData) {
+            return const MainHomeScreen();
+          }
+
+          return LoginScreen(
+            onLogin: () {}, // FIX
+          );
+        },
+      ),
     );
   }
 }
@@ -55,9 +62,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("To-Do App"),
-      ),
+      appBar: AppBar(title: const Text("Week #")),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,

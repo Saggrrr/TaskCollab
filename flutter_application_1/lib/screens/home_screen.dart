@@ -27,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('♤')),
+      // ❌ Removed AppBar (no heading)
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
