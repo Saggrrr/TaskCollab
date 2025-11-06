@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'user_task_screen.dart';
 
 class RoomScreen extends StatefulWidget {
   final String roomCode;
-  const RoomScreen({required this.roomCode, super.key});
+  final String? memberId; // new optional parameter
+
+  const RoomScreen({required this.roomCode, this.memberId, super.key});
 
   @override
   State<RoomScreen> createState() => _RoomScreenState();
@@ -27,21 +28,27 @@ class _RoomScreenState extends State<RoomScreen> {
     "Your effort adds value to the whole."
   ];
   late String _todayQuote;
+  late String _viewingUserId;
 
   @override
   void initState() {
     super.initState();
     _todayQuote = _quotes[Random().nextInt(_quotes.length)];
+    _viewingUserId = widget.memberId ?? _auth.currentUser!.uid;
   }
 
   Future<void> _addTask() async {
     if (_controller.text.isEmpty) return;
-    await _db.collection('rooms').doc(widget.roomCode).collection('tasks').add({
+    await _db
+        .collection('rooms')
+        .doc(widget.roomCode)
+        .collection('tasks')
+        .add({
       'title': _controller.text,
       'done': false,
       'priority': _selectedPriority,
       'createdAt': FieldValue.serverTimestamp(),
-      'userId': _auth.currentUser!.uid,
+      'createdBy': _auth.currentUser!.uid, // identify owner
     });
     _controller.clear();
   }
@@ -91,7 +98,10 @@ class _RoomScreenState extends State<RoomScreen> {
 
   Widget _buildMemberAvatars(List members) {
     return FutureBuilder<QuerySnapshot>(
-      future: _db.collection('users').where(FieldPath.documentId, whereIn: members).get(),
+      future: _db
+          .collection('users')
+          .where(FieldPath.documentId, whereIn: members)
+          .get(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox(height: 40);
         final users = snapshot.data!.docs;
@@ -100,23 +110,20 @@ class _RoomScreenState extends State<RoomScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             for (var user in users)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => UserTaskScreen(
-                          userId: user.id,
-                          userName: user['name'] ?? 'Unnamed',
-                          roomCode: widget.roomCode,
-                          imageUrl: user['imageUrl'] ??
-                              "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
-                        ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RoomScreen(
+                        roomCode: widget.roomCode,
+                        memberId: user.id, // open their task view
                       ),
-                    );
-                  },
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: CircleAvatar(
                     radius: 22,
                     backgroundImage: NetworkImage(
@@ -134,21 +141,29 @@ class _RoomScreenState extends State<RoomScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isOwnView = _viewingUserId == _auth.currentUser!.uid;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text("Room: ${widget.roomCode}",
-            style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          isOwnView
+              ? "My Tasks - ${widget.roomCode}"
+              : "Tasks by ${_viewingUserId.substring(0, 5)}",
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: Colors.deepPurpleAccent,
         elevation: 2,
-        actions: [
-          IconButton(
-            onPressed: _leaveRoom,
-            icon: const Icon(Icons.exit_to_app),
-            tooltip: "Leave Room",
-          )
-        ],
+        actions: isOwnView
+            ? [
+                IconButton(
+                  onPressed: _leaveRoom,
+                  icon: const Icon(Icons.exit_to_app),
+                  tooltip: "Leave Room",
+                )
+              ]
+            : null,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -170,88 +185,95 @@ class _RoomScreenState extends State<RoomScreen> {
             ),
             const SizedBox(height: 20),
 
+            // Member avatars
             StreamBuilder<DocumentSnapshot>(
-              stream: _db.collection('rooms').doc(widget.roomCode).snapshots(),
+              stream:
+                  _db.collection('rooms').doc(widget.roomCode).snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const SizedBox();
                 final data = snapshot.data!.data() as Map<String, dynamic>?;
-                if (data == null || data['members'] == null) return const SizedBox();
+                if (data == null || data['members'] == null) {
+                  return const SizedBox();
+                }
                 final members = List<String>.from(data['members']);
                 if (members.isEmpty) return const SizedBox();
                 return _buildMemberAvatars(members);
               },
             ),
-
             const SizedBox(height: 25),
 
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(
-                      hintText: 'Enter a shared task',
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+            // Add task (only for self)
+            if (isOwnView)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: InputDecoration(
+                        hintText: 'Enter a shared task',
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                       ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedPriority,
-                      items: ['Low', 'Medium', 'High']
-                          .map((p) => DropdownMenuItem(
-                                value: p,
-                                child: Text(
-                                  p,
-                                  style: TextStyle(
-                                    color: _getPriorityColor(p),
-                                    fontWeight: FontWeight.bold,
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedPriority,
+                        items: ['Low', 'Medium', 'High']
+                            .map((p) => DropdownMenuItem(
+                                  value: p,
+                                  child: Text(
+                                    p,
+                                    style: TextStyle(
+                                      color: _getPriorityColor(p),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() => _selectedPriority = v!),
+                                ))
+                            .toList(),
+                        onChanged: (v) => setState(() => _selectedPriority = v!),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: _addTask,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurpleAccent,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _addTask,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurpleAccent,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 14),
+                    ),
+                    child: const Text('Add'),
                   ),
-                  child: const Text('Add'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 25),
+                ],
+              ),
 
-            // Shared task list
+            if (isOwnView) const SizedBox(height: 25),
+
+            // Task list (filtered by user)
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: _db
                     .collection('rooms')
                     .doc(widget.roomCode)
                     .collection('tasks')
+                    .where('createdBy', isEqualTo: _viewingUserId)
                     .orderBy('createdAt', descending: true)
                     .snapshots(),
                 builder: (context, snapshot) {
@@ -260,7 +282,7 @@ class _RoomScreenState extends State<RoomScreen> {
                   }
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                     return const Center(
-                      child: Text('No shared tasks yet!',
+                      child: Text('No tasks yet!',
                           style: TextStyle(color: Colors.grey)),
                     );
                   }
@@ -273,21 +295,24 @@ class _RoomScreenState extends State<RoomScreen> {
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         color: data['done']
                             ? Colors.grey[200]
-                            : _getPriorityColor(data['priority']).withOpacity(0.3),
+                            : _getPriorityColor(data['priority'])
+                                .withOpacity(0.3),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16)),
                         child: ListTile(
                           leading: Checkbox(
                             value: data['done'],
                             activeColor: Colors.deepPurpleAccent,
-                            onChanged: (val) {
-                              _db
-                                  .collection('rooms')
-                                  .doc(widget.roomCode)
-                                  .collection('tasks')
-                                  .doc(doc.id)
-                                  .update({'done': val});
-                            },
+                            onChanged: isOwnView
+                                ? (val) {
+                                    _db
+                                        .collection('rooms')
+                                        .doc(widget.roomCode)
+                                        .collection('tasks')
+                                        .doc(doc.id)
+                                        .update({'done': val});
+                                  }
+                                : null,
                           ),
                           title: Text(
                             data['title'] ?? '',
@@ -296,8 +321,9 @@ class _RoomScreenState extends State<RoomScreen> {
                               decoration: data['done']
                                   ? TextDecoration.lineThrough
                                   : TextDecoration.none,
-                              color:
-                                  data['done'] ? Colors.grey : Colors.black87,
+                              color: data['done']
+                                  ? Colors.grey
+                                  : Colors.black87,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -309,6 +335,20 @@ class _RoomScreenState extends State<RoomScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          trailing: isOwnView
+                              ? IconButton(
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.redAccent),
+                                  onPressed: () {
+                                    _db
+                                        .collection('rooms')
+                                        .doc(widget.roomCode)
+                                        .collection('tasks')
+                                        .doc(doc.id)
+                                        .delete();
+                                  },
+                                )
+                              : null,
                         ),
                       );
                     }).toList(),
