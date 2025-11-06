@@ -92,34 +92,29 @@ class _RoomScreenState extends State<RoomScreen> {
   }
 
   Widget _buildMemberAvatars(List members) {
-    final displayCount = min(members.length, 5);
-    final extraCount = members.length - displayCount;
+    return FutureBuilder<QuerySnapshot>(
+      future: _db.collection('users').where(FieldPath.documentId, whereIn: members).get(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox(height: 40);
+        final users = snapshot.data!.docs;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (int i = 0; i < displayCount; i++)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: CircleAvatar(
-              backgroundImage: AssetImage(
-                  'assets/avatars/avatar${i + 1}.png'), // placeholder
-              radius: 22,
-            ),
-          ),
-        if (extraCount > 0)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: CircleAvatar(
-              backgroundColor: Colors.grey[300],
-              radius: 22,
-              child: Text(
-                '+$extraCount',
-                style: const TextStyle(color: Colors.black87),
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var user in users)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: CircleAvatar(
+                  radius: 22,
+                  backgroundImage: NetworkImage(
+                    user['imageUrl'] ??
+                        "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+                  ),
+                ),
               ),
-            ),
-          )
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -168,7 +163,7 @@ class _RoomScreenState extends State<RoomScreen> {
                 if (!snapshot.hasData) return const SizedBox();
                 final data = snapshot.data!.data() as Map<String, dynamic>?;
                 if (data == null || data['members'] == null) return const SizedBox();
-                final members = data['members'] as List;
+                final members = List<String>.from(data['members']);
                 if (members.isEmpty) return const SizedBox();
                 return _buildMemberAvatars(members);
               },
