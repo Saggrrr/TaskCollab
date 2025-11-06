@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class RoomScreen extends StatefulWidget {
   final String roomCode;
@@ -12,6 +13,7 @@ class RoomScreen extends StatefulWidget {
 
 class _RoomScreenState extends State<RoomScreen> {
   final _db = FirebaseFirestore.instance;
+  final _auth = FirebaseAuth.instance;
   final TextEditingController _controller = TextEditingController();
   String _selectedPriority = 'Low';
 
@@ -57,6 +59,70 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
+  Future<void> _leaveRoom() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Leave Room"),
+        content: const Text("Are you sure you want to leave this room?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("No"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Yes"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    await _db.collection('rooms').doc(widget.roomCode).update({
+      'members': FieldValue.arrayRemove([uid])
+    });
+
+    if (!mounted) return;
+    Navigator.pop(context);
+  }
+
+  Widget _buildMemberAvatars(List members) {
+    final displayCount = min(members.length, 5);
+    final extraCount = members.length - displayCount;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (int i = 0; i < displayCount; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: CircleAvatar(
+              backgroundImage: AssetImage(
+                  'assets/avatars/avatar${i + 1}.png'), // placeholder
+              radius: 22,
+            ),
+          ),
+        if (extraCount > 0)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: CircleAvatar(
+              backgroundColor: Colors.grey[300],
+              radius: 22,
+              child: Text(
+                '+$extraCount',
+                style: const TextStyle(color: Colors.black87),
+              ),
+            ),
+          )
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,6 +133,13 @@ class _RoomScreenState extends State<RoomScreen> {
         centerTitle: true,
         backgroundColor: Colors.deepPurpleAccent,
         elevation: 2,
+        actions: [
+          IconButton(
+            onPressed: _leaveRoom,
+            icon: const Icon(Icons.exit_to_app),
+            tooltip: "Leave Room",
+          )
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -88,26 +161,19 @@ class _RoomScreenState extends State<RoomScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Avatars using local assets
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                CircleAvatar(
-                    backgroundImage:
-                        AssetImage('assets/avatars/avatar1.png'),
-                    radius: 22),
-                SizedBox(width: 8),
-                CircleAvatar(
-                    backgroundImage:
-                        AssetImage('assets/avatars/avatar2.png'),
-                    radius: 22),
-                SizedBox(width: 8),
-                CircleAvatar(
-                    backgroundImage:
-                        AssetImage('assets/avatars/avatar3.png'),
-                    radius: 22),
-              ],
+            // Member avatars from Firestore
+            StreamBuilder<DocumentSnapshot>(
+              stream: _db.collection('rooms').doc(widget.roomCode).snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const SizedBox();
+                final data = snapshot.data!.data() as Map<String, dynamic>?;
+                if (data == null || data['members'] == null) return const SizedBox();
+                final members = data['members'] as List;
+                if (members.isEmpty) return const SizedBox();
+                return _buildMemberAvatars(members);
+              },
             ),
+
             const SizedBox(height: 25),
 
             // Task input

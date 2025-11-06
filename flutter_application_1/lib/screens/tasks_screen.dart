@@ -17,7 +17,7 @@ class _TasksScreenState extends State<TasksScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  late String _uid; // ✅ Make it non-nullable
+  String? _uid;
   bool _isLoading = true;
 
   final List<String> _quotes = [
@@ -40,8 +40,10 @@ class _TasksScreenState extends State<TasksScreen> {
   Future<void> _loadUser() async {
     final user = _auth.currentUser;
     if (user != null) {
-      _uid = user.uid;
-      setState(() => _isLoading = false);
+      setState(() {
+        _uid = user.uid;
+        _isLoading = false;
+      });
     } else {
       _auth.authStateChanges().listen((user) {
         if (user != null && mounted) {
@@ -55,13 +57,13 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _addTask() async {
-    if (_controller.text.isEmpty || _isLoading) return;
+    if (_controller.text.isEmpty || _uid == null) return;
 
     await _db.collection('tasks').add({
       'title': _controller.text,
       'done': false,
       'priority': _selectedPriority,
-      'userId': _uid, // ✅ Correct user ID
+      'userId': _uid,
       'createdAt': FieldValue.serverTimestamp(),
     });
 
@@ -88,29 +90,30 @@ class _TasksScreenState extends State<TasksScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Personal Tasks'),
+        backgroundColor: Colors.deepPurpleAccent,
+        centerTitle: true,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 40),
-
+            const SizedBox(height: 20),
             Center(
               child: Text(
                 _todayQuote,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 20,
+                  fontSize: 18,
                   fontStyle: FontStyle.italic,
                   color: Colors.black87,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
@@ -130,9 +133,7 @@ class _TasksScreenState extends State<TasksScreen> {
                     radius: 22),
               ],
             ),
-
-            const SizedBox(height: 25),
-
+            const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
@@ -174,7 +175,8 @@ class _TasksScreenState extends State<TasksScreen> {
                                 ),
                               ))
                           .toList(),
-                      onChanged: (v) => setState(() => _selectedPriority = v!),
+                      onChanged: (v) =>
+                          setState(() => _selectedPriority = v!),
                     ),
                   ),
                 ),
@@ -192,9 +194,7 @@ class _TasksScreenState extends State<TasksScreen> {
                 ),
               ],
             ),
-
-            const SizedBox(height: 25),
-
+            const SizedBox(height: 20),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: _db
@@ -207,20 +207,22 @@ class _TasksScreenState extends State<TasksScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  final docs = snapshot.data?.docs ?? [];
+                  if (docs.isEmpty) {
                     return const Center(
-                      child: Text('No tasks yet. Add one!',
-                          style: TextStyle(color: Colors.grey)),
+                      child: Text(
+                        'No tasks yet. Add one!',
+                        style: TextStyle(color: Colors.grey),
+                      ),
                     );
                   }
 
-                  final docs = snapshot.data!.docs;
-
-                  return ListView(
-                    children: docs.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
+                  return ListView.builder(
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data() as Map<String, dynamic>;
                       return Card(
-                        elevation: 3,
+                        elevation: 2,
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         color: data['done']
                             ? Colors.grey[200]
@@ -235,7 +237,7 @@ class _TasksScreenState extends State<TasksScreen> {
                             onChanged: (val) {
                               _db
                                   .collection('tasks')
-                                  .doc(doc.id)
+                                  .doc(docs[index].id)
                                   .update({'done': val});
                             },
                           ),
@@ -246,8 +248,7 @@ class _TasksScreenState extends State<TasksScreen> {
                               decoration: data['done']
                                   ? TextDecoration.lineThrough
                                   : TextDecoration.none,
-                              color:
-                                  data['done'] ? Colors.grey : Colors.black87,
+                              color: data['done'] ? Colors.grey : Colors.black87,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -263,12 +264,15 @@ class _TasksScreenState extends State<TasksScreen> {
                             icon: const Icon(Icons.delete,
                                 color: Colors.redAccent),
                             onPressed: () {
-                              _db.collection('tasks').doc(doc.id).delete();
+                              _db
+                                  .collection('tasks')
+                                  .doc(docs[index].id)
+                                  .delete();
                             },
                           ),
                         ),
                       );
-                    }).toList(),
+                    },
                   );
                 },
               ),

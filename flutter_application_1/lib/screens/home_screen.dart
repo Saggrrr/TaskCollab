@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.list_alt),
-              title: const Text('Tasks'),
+              title: const Text('Personal Tasks'),
               onTap: () => _selectPage(0),
             ),
             ListTile(

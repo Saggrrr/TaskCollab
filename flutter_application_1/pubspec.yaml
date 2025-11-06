@@ -93,7 +93,6 @@
 #   #
 #   # For details regarding fonts from package dependencies,
 #   # see https://flutter.dev/to/font-from-packagename: flutter_application_1
-
 name: flutter_application_1
 description: "A new Flutter project."
 publish_to: 'none'
@@ -101,7 +100,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.9.2
+  sdk: ">=3.9.2 <4.0.0"
 
 dependencies:
   flutter:
@@ -119,11 +118,11 @@ dependencies:
   # Cloud Firestore (database for todos, profiles, etc.)
   cloud_firestore: ^5.4.4
 
-  # Firebase Storage (for uploading images)
+  # Firebase Storage (optional, for uploading images)
   firebase_storage: ^12.1.0
 
   # Image picker (select image from gallery/camera)
-  image_picker: ^1.1.2
+  image_picker: ^1.1.5
 
   # Optional – for testing on multiple devices/resolutions
   device_preview: ^1.3.1
