@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'user_task_screen.dart';
 
 class RoomScreen extends StatefulWidget {
   final String roomCode;
@@ -35,15 +36,12 @@ class _RoomScreenState extends State<RoomScreen> {
 
   Future<void> _addTask() async {
     if (_controller.text.isEmpty) return;
-    await _db
-        .collection('rooms')
-        .doc(widget.roomCode)
-        .collection('tasks')
-        .add({
+    await _db.collection('rooms').doc(widget.roomCode).collection('tasks').add({
       'title': _controller.text,
       'done': false,
       'priority': _selectedPriority,
       'createdAt': FieldValue.serverTimestamp(),
+      'userId': _auth.currentUser!.uid,
     });
     _controller.clear();
   }
@@ -104,11 +102,27 @@ class _RoomScreenState extends State<RoomScreen> {
             for (var user in users)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: CircleAvatar(
-                  radius: 22,
-                  backgroundImage: NetworkImage(
-                    user['imageUrl'] ??
-                        "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => UserTaskScreen(
+                          userId: user.id,
+                          userName: user['name'] ?? 'Unnamed',
+                          roomCode: widget.roomCode,
+                          imageUrl: user['imageUrl'] ??
+                              "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+                        ),
+                      ),
+                    );
+                  },
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundImage: NetworkImage(
+                      user['imageUrl'] ??
+                          "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+                    ),
                   ),
                 ),
               ),
@@ -156,7 +170,6 @@ class _RoomScreenState extends State<RoomScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Member avatars from Firestore
             StreamBuilder<DocumentSnapshot>(
               stream: _db.collection('rooms').doc(widget.roomCode).snapshots(),
               builder: (context, snapshot) {
@@ -171,7 +184,6 @@ class _RoomScreenState extends State<RoomScreen> {
 
             const SizedBox(height: 25),
 
-            // Task input
             Row(
               children: [
                 Expanded(
@@ -185,8 +197,8 @@ class _RoomScreenState extends State<RoomScreen> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                   ),
                 ),
@@ -224,8 +236,8 @@ class _RoomScreenState extends State<RoomScreen> {
                     backgroundColor: Colors.deepPurpleAccent,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 14),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   ),
                   child: const Text('Add'),
                 ),
@@ -233,7 +245,7 @@ class _RoomScreenState extends State<RoomScreen> {
             ),
             const SizedBox(height: 25),
 
-            // Task list
+            // Shared task list
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: _db
@@ -261,8 +273,7 @@ class _RoomScreenState extends State<RoomScreen> {
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         color: data['done']
                             ? Colors.grey[200]
-                            : _getPriorityColor(data['priority'])
-                                .withOpacity(0.3),
+                            : _getPriorityColor(data['priority']).withOpacity(0.3),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16)),
                         child: ListTile(
@@ -297,18 +308,6 @@ class _RoomScreenState extends State<RoomScreen> {
                                   .withOpacity(0.9),
                               fontWeight: FontWeight.w600,
                             ),
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete,
-                                color: Colors.redAccent),
-                            onPressed: () {
-                              _db
-                                  .collection('rooms')
-                                  .doc(widget.roomCode)
-                                  .collection('tasks')
-                                  .doc(doc.id)
-                                  .delete();
-                            },
                           ),
                         ),
                       );
