@@ -92,7 +92,8 @@
 #   #         weight: 700
 #   #
 #   # For details regarding fonts from package dependencies,
-#   # see https://flutter.dev/to/font-from-package
+#   # see https://flutter.dev/to/font-from-packagename: flutter_application_1
+
 name: flutter_application_1
 description: "A new Flutter project."
 publish_to: 'none'
@@ -106,27 +107,32 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # UI icons
   cupertino_icons: ^1.0.8
 
-  # firebase core + auth
+  # Firebase core (required for all Firebase features)
   firebase_core: ^3.8.0
+
+  # Firebase authentication (login/register)
   firebase_auth: ^5.2.0
 
-  # needed because we store user info
+  # Cloud Firestore (database for todos, profiles, etc.)
   cloud_firestore: ^5.4.4
 
-  # needed because we upload user dp
+  # Firebase Storage (for uploading images)
   firebase_storage: ^12.1.0
 
-  # to pick image from gallery or camera
+  # Image picker (select image from gallery/camera)
   image_picker: ^1.1.2
 
-  # optional (you already had this)
+  # Optional – for testing on multiple devices/resolutions
   device_preview: ^1.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  # Code linting and best practices
   flutter_lints: ^5.0.0
 
 flutter:

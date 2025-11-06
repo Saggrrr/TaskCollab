@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -9,11 +11,15 @@ class TasksScreen extends StatefulWidget {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
-  final List<Map<String, dynamic>> _tasks = [];
   final TextEditingController _controller = TextEditingController();
   String _selectedPriority = 'Low';
 
-  // 🌟 Quote list
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  late String _uid; // ✅ Make it non-nullable
+  bool _isLoading = true;
+
   final List<String> _quotes = [
     "Small steps every day lead to big changes.",
     "Focus on progress, not perfection.",
@@ -22,27 +28,44 @@ class _TasksScreenState extends State<TasksScreen> {
     "Consistency beats motivation.",
     "Your future is created by what you do today.",
   ];
-
   late String _todayQuote;
 
   @override
   void initState() {
     super.initState();
-    final random = Random();
-    _todayQuote = _quotes[random.nextInt(_quotes.length)];
+    _todayQuote = _quotes[Random().nextInt(_quotes.length)];
+    _loadUser();
   }
 
-  void _addTask() {
-    if (_controller.text.isNotEmpty) {
-      setState(() {
-        _tasks.add({
-          'title': _controller.text,
-          'done': false,
-          'priority': _selectedPriority,
-        });
-        _controller.clear();
+  Future<void> _loadUser() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      _uid = user.uid;
+      setState(() => _isLoading = false);
+    } else {
+      _auth.authStateChanges().listen((user) {
+        if (user != null && mounted) {
+          setState(() {
+            _uid = user.uid;
+            _isLoading = false;
+          });
+        }
       });
     }
+  }
+
+  Future<void> _addTask() async {
+    if (_controller.text.isEmpty || _isLoading) return;
+
+    await _db.collection('tasks').add({
+      'title': _controller.text,
+      'done': false,
+      'priority': _selectedPriority,
+      'userId': _uid, // ✅ Correct user ID
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    _controller.clear();
   }
 
   Color _getPriorityColor(String priority) {
@@ -56,29 +79,14 @@ class _TasksScreenState extends State<TasksScreen> {
     }
   }
 
-  void _toggleTask(int index) {
-    setState(() {
-      _tasks[index]['done'] = !_tasks[index]['done'];
-      _tasks.sort((a, b) => a['done'] == b['done'] ? 0 : (a['done'] ? 1 : -1));
-    });
-  }
-
-  void _deleteTask(int index) {
-    setState(() {
-      _tasks.removeAt(index);
-    });
-  }
-
-  void _reorderTasks(int oldIndex, int newIndex) {
-    setState(() {
-      if (newIndex > oldIndex) newIndex--;
-      final task = _tasks.removeAt(oldIndex);
-      _tasks.insert(newIndex, task);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Padding(
@@ -88,7 +96,6 @@ class _TasksScreenState extends State<TasksScreen> {
           children: [
             const SizedBox(height: 40),
 
-            // 🌟 Daily Quote Header
             Center(
               child: Text(
                 _todayQuote,
@@ -104,30 +111,28 @@ class _TasksScreenState extends State<TasksScreen> {
 
             const SizedBox(height: 20),
 
-            // 👥 Collaborators
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
                 CircleAvatar(
-                  backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=1'),
-                  radius: 22,
-                ),
+                    backgroundImage:
+                        NetworkImage('https://i.pravatar.cc/150?img=1'),
+                    radius: 22),
                 SizedBox(width: 8),
                 CircleAvatar(
-                  backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=2'),
-                  radius: 22,
-                ),
+                    backgroundImage:
+                        NetworkImage('https://i.pravatar.cc/150?img=2'),
+                    radius: 22),
                 SizedBox(width: 8),
                 CircleAvatar(
-                  backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=3'),
-                  radius: 22,
-                ),
+                    backgroundImage:
+                        NetworkImage('https://i.pravatar.cc/150?img=3'),
+                    radius: 22),
               ],
             ),
 
             const SizedBox(height: 25),
 
-            // Task input + priority
             Row(
               children: [
                 Expanded(
@@ -141,8 +146,8 @@ class _TasksScreenState extends State<TasksScreen> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                     ),
                   ),
                 ),
@@ -156,47 +161,20 @@ class _TasksScreenState extends State<TasksScreen> {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      dropdownColor: Colors.white,
                       value: _selectedPriority,
-                      icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                      items: [
-                        DropdownMenuItem(
-                          value: 'Low',
-                          child: Text(
-                            'Low',
-                            style: TextStyle(
-                              color: Colors.green[700],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Medium',
-                          child: Text(
-                            'Medium',
-                            style: TextStyle(
-                              color: Colors.orange[700],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'High',
-                          child: Text(
-                            'High',
-                            style: TextStyle(
-                              color: Colors.red[700],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedPriority = value!;
-                        });
-                      },
+                      items: ['Low', 'Medium', 'High']
+                          .map((p) => DropdownMenuItem(
+                                value: p,
+                                child: Text(
+                                  p,
+                                  style: TextStyle(
+                                    color: _getPriorityColor(p),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() => _selectedPriority = v!),
                     ),
                   ),
                 ),
@@ -207,8 +185,8 @@ class _TasksScreenState extends State<TasksScreen> {
                     backgroundColor: Colors.greenAccent[700],
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 14),
                   ),
                   child: const Text('Add'),
                 ),
@@ -217,86 +195,85 @@ class _TasksScreenState extends State<TasksScreen> {
 
             const SizedBox(height: 25),
 
-            // Task list with draggable behavior
             Expanded(
-              child: Listener(
-                onPointerMove: (_) {}, // Prevents crash on desktop drag
-                child: ReorderableListView.builder(
-                  buildDefaultDragHandles: false,
-                  itemCount: _tasks.length,
-                  onReorder: _reorderTasks,
-                  itemBuilder: (context, index) {
-                    final task = _tasks[index];
-                    return LongPressDraggable<int>(
-                      key: ValueKey(task),
-                      data: index,
-                      feedback: Material(
-                        color: Colors.transparent,
-                        child: Transform.scale(
-                          scale: 1.05,
-                          child: Opacity(
-                            opacity: 0.95,
-                            child: _buildTaskCard(task, index),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _db
+                    .collection('tasks')
+                    .where('userId', isEqualTo: _uid)
+                    .orderBy('createdAt', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(
+                      child: Text('No tasks yet. Add one!',
+                          style: TextStyle(color: Colors.grey)),
+                    );
+                  }
+
+                  final docs = snapshot.data!.docs;
+
+                  return ListView(
+                    children: docs.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return Card(
+                        elevation: 3,
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        color: data['done']
+                            ? Colors.grey[200]
+                            : _getPriorityColor(data['priority'])
+                                .withOpacity(0.35),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                        child: ListTile(
+                          leading: Checkbox(
+                            value: data['done'],
+                            activeColor: Colors.greenAccent[700],
+                            onChanged: (val) {
+                              _db
+                                  .collection('tasks')
+                                  .doc(doc.id)
+                                  .update({'done': val});
+                            },
+                          ),
+                          title: Text(
+                            data['title'] ?? '',
+                            style: TextStyle(
+                              fontSize: 16,
+                              decoration: data['done']
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
+                              color:
+                                  data['done'] ? Colors.grey : Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: Text(
+                            "Priority: ${data['priority']}",
+                            style: TextStyle(
+                              color: _getPriorityColor(data['priority'])
+                                  .withOpacity(0.9),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete,
+                                color: Colors.redAccent),
+                            onPressed: () {
+                              _db.collection('tasks').doc(doc.id).delete();
+                            },
                           ),
                         ),
-                      ),
-                      childWhenDragging: Opacity(
-                        opacity: 0.3,
-                        child: _buildTaskCard(task, index),
-                      ),
-                      child: _buildReorderableCard(task, index),
-                    );
-                  },
-                ),
+                      );
+                    }).toList(),
+                  );
+                },
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReorderableCard(Map<String, dynamic> task, int index) {
-    return ReorderableDelayedDragStartListener(
-      index: index,
-      child: _buildTaskCard(task, index),
-    );
-  }
-
-  Widget _buildTaskCard(Map<String, dynamic> task, int index) {
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      color: task['done']
-          ? Colors.grey[200]
-          : _getPriorityColor(task['priority']).withOpacity(0.35),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        leading: Checkbox(
-          value: task['done'],
-          activeColor: Colors.greenAccent[700],
-          onChanged: (_) => _toggleTask(index),
-        ),
-        title: Text(
-          task['title'],
-          style: TextStyle(
-            fontSize: 16,
-            decoration:
-                task['done'] ? TextDecoration.lineThrough : TextDecoration.none,
-            color: task['done'] ? Colors.grey : Colors.black,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        subtitle: Text(
-          "Priority: ${task['priority']}",
-          style: TextStyle(
-            color: _getPriorityColor(task['priority']).withOpacity(0.9),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete, color: Colors.redAccent),
-          onPressed: () => _deleteTask(index),
         ),
       ),
     );
