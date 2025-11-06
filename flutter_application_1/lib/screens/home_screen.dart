@@ -14,7 +14,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = const [
-    TasksScreen(),   // 👈 Default page (home)
+    TasksScreen(),
     ProfileScreen(),
     ChatroomScreen(),
   ];
@@ -27,7 +27,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ❌ Removed AppBar (no heading)
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -55,6 +54,15 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: const Icon(Icons.chat),
               title: const Text('Chatroom'),
               onTap: () => _selectPage(2),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.group_add),
+              title: const Text('Create / Join Room'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/joinRoom');
+              },
             ),
           ],
         ),

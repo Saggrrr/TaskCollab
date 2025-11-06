@@ -3,6 +3,8 @@ import 'screens/login_screen.dart';
 import 'screens/tasks_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/chatroom_screen.dart';
+import 'screens/join_or_create_room.dart';
+import 'screens/room_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -24,6 +26,13 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'To-Do App',
       theme: ThemeData(primarySwatch: Colors.blue),
+      routes: {
+        '/joinRoom': (context) => JoinOrCreateRoom(),
+        '/room': (context) {
+          final code = ModalRoute.of(context)!.settings.arguments as String;
+          return RoomScreen(roomCode: code);
+        },
+      },
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
@@ -35,9 +44,7 @@ class MyApp extends StatelessWidget {
             return const MainHomeScreen();
           }
 
-          return LoginScreen(
-            onLogin: () {}, // FIX
-          );
+          return LoginScreen(onLogin: () {});
         },
       ),
     );
@@ -62,7 +69,16 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Week #")),
+      appBar: AppBar(
+        title: const Text("Week #"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.group),
+            tooltip: "Join/Create Room",
+            onPressed: () => Navigator.pushNamed(context, '/joinRoom'),
+          ),
+        ],
+      ),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -94,6 +110,15 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               onTap: () {
                 setState(() => _selectedIndex = 2);
                 Navigator.pop(context);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.group_add),
+              title: const Text("Create / Join Room"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/joinRoom');
               },
             ),
           ],
