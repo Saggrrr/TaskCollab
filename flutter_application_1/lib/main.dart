@@ -5,6 +5,7 @@ import 'screens/profile_screen.dart';
 import 'screens/chatroom_screen.dart';
 import 'screens/join_or_create_room.dart';
 import 'screens/room_screen.dart';
+import 'screens/my_rooms.dart'; // ✅ added
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -27,7 +28,8 @@ class MyApp extends StatelessWidget {
       title: 'To-Do App',
       theme: ThemeData(primarySwatch: Colors.blue),
       routes: {
-        '/joinRoom': (context) => JoinOrCreateRoom(),
+        '/joinRoom': (context) => const JoinOrCreateRoom(),
+        '/myRooms': (context) => const MyRoomsScreen(), // ✅ added
         '/room': (context) {
           final code = ModalRoute.of(context)!.settings.arguments as String;
           return RoomScreen(roomCode: code);
@@ -60,6 +62,7 @@ class MainHomeScreen extends StatefulWidget {
 
 class _MainHomeScreenState extends State<MainHomeScreen> {
   int _selectedIndex = 0;
+
   final List<Widget> _screens = const [
     TasksScreen(),
     ProfileScreen(),
@@ -119,6 +122,14 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/joinRoom');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.meeting_room_rounded),
+              title: const Text("My Rooms"), // ✅ direct access from drawer too
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/myRooms');
               },
             ),
           ],
